@@ -64,6 +64,16 @@ var _ = Describe("The counterfeiter CLI", func() {
 		Expect(string(actualContents)).To(Equal(string(expectedContents)))
 	})
 
+	It("can generate a fake for an interface found in a vendor directory", func() {
+		copyIn("vendored/vendor", pathToCLI)
+
+		session := startCounterfeiter(pathToCLI, "apackage", "VendorInterface")
+		Eventually(session).Should(gexec.Exit(1)) // Fixme eventually should be zero
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("Wrote `FakeVendorInterface`"))
+	})
+
 	Describe("when given a single argument", func() {
 		BeforeEach(func() {
 			copyIn("other_types.go", pathToCLI)
@@ -89,8 +99,8 @@ var _ = Describe("The counterfeiter CLI", func() {
 			session := startCounterfeiter(pathToCLI, "something.go", "Something")
 
 			Eventually(session).Should(gexec.Exit(0))
-			output := string(session.Out.Contents())
 
+			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring("Wrote `FakeSomething`"))
 		})
 	})
@@ -121,6 +131,7 @@ func copyIn(fixture string, destination string) {
 	destination = filepath.Join(destination, "fixtures")
 	err := os.MkdirAll(destination, 0777)
 	Expect(err).ToNot(HaveOccurred())
+
 	filepath.Walk(filepath.Join("..", "fixtures", fixture), func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil

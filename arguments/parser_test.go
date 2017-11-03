@@ -79,15 +79,26 @@ var _ = Describe("parsing arguments", func() {
 		Context("given a stdlib package", func() {
 			It("sets arguments as expected", func() {
 				Expect(parsedArgs.SourcePackageDir).To(Equal(path.Join(runtime.GOROOT(), "src/os")))
-				Expect(parsedArgs.OutputPath).To(Equal(path.Join(cwd(), "osshim")))
+				Expect(parsedArgs.OptionalOutputPath).To(Equal(""))
 				Expect(parsedArgs.DestinationPackageName).To(Equal("osshim"))
+			})
+		})
+
+		Context("when the -o flag is provided as well", func() {
+			BeforeEach(func() {
+				args = []string{"os"}
+				*outputPathFlag = "/tmp/bar"
+			})
+
+			It("passes along the provided output path", func() {
+				Expect(parsedArgs.OptionalOutputPath).To(Equal("/tmp/bar"))
 			})
 		})
 
 		Context("given a relative path to a path to a package", func() {})
 	})
 
-	Describe("when a single argument is provided", func() {
+	Context("when a single argument is provided", func() {
 		BeforeEach(func() {
 			args = []string{"someonesinterfaces.AnInterface"}
 		})
@@ -108,12 +119,11 @@ var _ = Describe("parsing arguments", func() {
 			Expect(parsedArgs.InterfaceName).To(Equal("AnInterface"))
 		})
 
-		It("snake cases the filename for the output directory", func() {
-			Expect(parsedArgs.OutputPath).To(Equal(
+		It("provides a destination directory that is the current working directory", func() {
+			Expect(parsedArgs.DestinationDir).To(Equal(
 				filepath.Join(
 					cwd(),
 					"workspacefakes",
-					"fake_an_interface.go",
 				),
 			))
 		})
@@ -142,7 +152,11 @@ var _ = Describe("parsing arguments", func() {
 		})
 
 		It("snake cases the filename for the output directory", func() {
-			Expect(parsedArgs.OutputPath).To(Equal("/tmp/foo"))
+			Expect(parsedArgs.OptionalOutputPath).To(Equal("/tmp/foo"))
+		})
+
+		It("provides a destination directory that is the current working directory", func() {
+			Expect(parsedArgs.DestinationDir).To(Equal("/tmp/foo"))
 		})
 	})
 
@@ -163,12 +177,13 @@ var _ = Describe("parsing arguments", func() {
 			Expect(parsedArgs.InterfaceName).To(Equal("MySpecialInterface"))
 		})
 
-		It("snake cases the filename for the output directory", func() {
-			Expect(parsedArgs.OutputPath).To(Equal(
+		It("provides a destination directory that is the fakes directory", func() {
+			Expect(parsedArgs.DestinationDir).To(Equal(
 				filepath.Join(
-					parsedArgs.SourcePackageDir,
+					cwd(),
+					"my",
+					"my5package",
 					"my5packagefakes",
-					"fake_my_special_interface.go",
 				),
 			))
 		})
@@ -186,12 +201,13 @@ var _ = Describe("parsing arguments", func() {
 				Expect(parsedArgs.FakeImplName).To(Equal("FakeMySpecialInterface"))
 			})
 
-			It("snake cases the filename for the output directory", func() {
-				Expect(parsedArgs.OutputPath).To(Equal(
+			It("provides a the destination directory", func() {
+				Expect(parsedArgs.DestinationDir).To(Equal(
 					filepath.Join(
-						parsedArgs.SourcePackageDir,
+						cwd(),
+						"my",
+						"mypackage",
 						"mypackagefakes",
-						"fake_my_special_interface.go",
 					),
 				))
 			})
@@ -270,12 +286,13 @@ var _ = Describe("parsing arguments", func() {
 				Expect(parsedArgs.PrintToStdOut).To(BeTrue())
 			})
 
-			It("snake cases the filename for the output directory", func() {
-				Expect(parsedArgs.OutputPath).To(Equal(
+			It("provides a destination directory", func() {
+				Expect(parsedArgs.DestinationDir).To(Equal(
 					filepath.Join(
-						parsedArgs.SourcePackageDir,
+						cwd(),
+						"my",
+						"mypackage",
 						"mypackagefakes",
-						"fake_my_special_interface.go",
 					),
 				))
 			})

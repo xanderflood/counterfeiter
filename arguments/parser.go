@@ -11,8 +11,57 @@ import (
 	"github.com/maxbrunsfeld/counterfeiter/terminal"
 )
 
+type PathAndOutputOptions struct {
+	SourcePackageDir       string // abs path to the dir containing the interface to fake
+	ImportPath             string // import path to the package containing the interface to fake
+	OutputPath             string // path to write the fake file to
+	DestinationPackageName string // often the base-dir for OutputPath but must be a valid package name
+}
+
+type PathResolver interface {
+	ResolvePath() PathAndOutputOptions
+}
+
+func NewPathResolver() PathResolver {
+	return pathResolver{}
+}
+
+type pathResolver struct{}
+
+func (p pathResolver) ResolvePath() PathAndOutputOptions {
+	return PathAndOutputOptions{
+
+	}
+}
+
+// ^^^ THERE BE DRAGONS UP THUR ^^^
+
+type ParsedArguments struct {
+	SourcePackageDir       string // abs path to the dir containing the interface to fake
+	ImportPath             string // import path to the package containing the interface to fake
+	OutputPath             string // path to write the fake file to
+	DestinationPackageName string // often the base-dir for OutputPath but must be a valid package name
+
+	DestinationDir     string // either the current working directory OR the dir specified as the first argument
+	OptionalOutputPath string // if the user specifies an output path with -o, it will be here
+
+	InterfaceName string // the name of the interface to counterfeit
+	FakeImplName  string // the name of the struct implementing the given interface
+	PrintToStdOut bool   // triggers writing to stdout or to "output path"
+
+	GenerateInterfaceAndShimFromPackageDirectory bool // triggers "package" mode, as opposed to "interface" mode
+}
+
 type ArgumentParser interface {
 	ParseArguments(...string) ParsedArguments
+}
+
+type argumentParser struct {
+	ui                terminal.UI
+	failHandler       FailHandler
+	currentWorkingDir CurrentWorkingDir
+	symlinkEvaler     SymlinkEvaler
+	fileStatReader    FileStatReader
 }
 
 func NewArgumentParser(
@@ -72,16 +121,19 @@ func (argParser *argumentParser) parseInterfaceArgs(args ...string) ParsedArgume
 	packageName := restrictToValidPackageName(filepath.Base(filepath.Dir(outputPath)))
 
 	return ParsedArguments{
-		GenerateInterfaceAndShimFromPackageDirectory: false,
-		SourcePackageDir:                             sourcePackageDir,
-		OutputPath:                                   outputPath,
-		ImportPath:                                   importPath,
-
-		InterfaceName:          interfaceName,
+		SourcePackageDir:       sourcePackageDir,
+		OutputPath:             outputPath,
+		ImportPath:             importPath,
 		DestinationPackageName: packageName,
-		FakeImplName:           fakeImplName,
 
+		DestinationDir:     argParser.getDestinationDir(rootDestinationDir, outputPathFlagValue),
+		OptionalOutputPath: outputPathFlagValue,
+
+		InterfaceName: interfaceName,
+		FakeImplName:  fakeImplName,
 		PrintToStdOut: any(args, "-"),
+
+		GenerateInterfaceAndShimFromPackageDirectory: false,
 	}
 }
 
@@ -99,37 +151,16 @@ func (argParser *argumentParser) parsePackageArgs(args ...string) ParsedArgument
 	}
 
 	return ParsedArguments{
-		GenerateInterfaceAndShimFromPackageDirectory: true,
-		SourcePackageDir:                             dir,
-		OutputPath:                                   outputPath,
-
+		SourcePackageDir:       dir,
+		OutputPath:             outputPath,
 		DestinationPackageName: packageName,
 
 		PrintToStdOut: any(args, "-"),
+
+		OptionalOutputPath: *outputPathFlag,
+
+		GenerateInterfaceAndShimFromPackageDirectory: true,
 	}
-}
-
-type argumentParser struct {
-	ui                terminal.UI
-	failHandler       FailHandler
-	currentWorkingDir CurrentWorkingDir
-	symlinkEvaler     SymlinkEvaler
-	fileStatReader    FileStatReader
-}
-
-type ParsedArguments struct {
-	GenerateInterfaceAndShimFromPackageDirectory bool
-
-	SourcePackageDir string // abs path to the dir containing the interface to fake
-	ImportPath       string // import path to the package containing the interface to fake
-	OutputPath       string // path to write the fake file to
-
-	DestinationPackageName string // often the base-dir for OutputPath but must be a valid package name
-
-	InterfaceName string // the interface to counterfeit
-	FakeImplName  string // the name of the struct implementing the given interface
-
-	PrintToStdOut bool
 }
 
 func fixupUnexportedNames(interfaceName string) string {
@@ -156,12 +187,24 @@ func (argParser *argumentParser) getOutputPath(rootDestinationDir, fakeName, arg
 	if arg == "" {
 		snakeCaseName := strings.ToLower(camelRegexp.ReplaceAllString(fakeName, "${1}_${2}"))
 		return filepath.Join(rootDestinationDir, packageNameForPath(rootDestinationDir), snakeCaseName+".go")
-	} else {
-		if !filepath.IsAbs(arg) {
-			arg = filepath.Join(argParser.currentWorkingDir(), arg)
-		}
-		return arg
 	}
+
+	if !filepath.IsAbs(arg) {
+		arg = filepath.Join(argParser.currentWorkingDir(), arg)
+	}
+	return arg
+}
+
+func (argParser *argumentParser) getDestinationDir(rootDestinationDir, possibleOutputPath string) string {
+	if possibleOutputPath == "" {
+		return filepath.Join(rootDestinationDir, packageNameForPath(rootDestinationDir))
+	}
+
+	if !filepath.IsAbs(possibleOutputPath) {
+		possibleOutputPath = filepath.Join(argParser.currentWorkingDir(), possibleOutputPath)
+	}
+
+	return possibleOutputPath
 }
 
 func packageNameForPath(pathToPackage string) string {

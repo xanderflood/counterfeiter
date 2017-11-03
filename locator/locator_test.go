@@ -189,23 +189,24 @@ var _ = Describe("Locator", func() {
 
 		It("should have a single method", func() {
 			Expect(model.Methods).To(HaveLen(1))
-			// Expect(model.Methods[0].Names[0].Name).To(Equal("DoThings"))
+			Expect(model.Methods[0].Field.Names[0].Name).To(Equal("DoThings"))
 		})
 	})
 
-	Describe("finding an interface in vendored code", func() {
+	Describe("dealing with vendored code", func() {
 		var model *model.InterfaceToFake
 		var err error
 
-		Context("when the vendor dir is in the same directory", func() {
+		Context("when you directly counterfeit vendored code", func() {
 			JustBeforeEach(func() {
-				model, err = GetInterfaceFromFilePath("FooInterface", "../fixtures/vendored/foo.go")
+				model, err = GetInterfaceFromFilePath("VendorInterface", "../fixtures/vendored/vendor/apackage/interface.go")
 				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("returns a model representing the named function alias", func() {
-				Expect(model.Name).To(Equal("FooInterface"))
+				Expect(model.Name).To(Equal("VendorInterface"))
 				Expect(model.RepresentedByInterface).To(BeTrue())
+				Expect(model.ImportPath).To(Equal("apackage"))
 			})
 
 			It("should have a single method", func() {
@@ -214,37 +215,59 @@ var _ = Describe("Locator", func() {
 			})
 		})
 
-		Context("when the vendor dir is in a parent directory", func() {
-			JustBeforeEach(func() {
-				model, err = GetInterfaceFromFilePath("BazInterface", "../fixtures/vendored/baz/baz.go")
-				Expect(err).NotTo(HaveOccurred())
+		Context("when you embed vendored code in an interface you own", func() {
+			Context("when the vendor dir is in the same directory", func() {
+				JustBeforeEach(func() {
+					model, err = GetInterfaceFromFilePath("FooInterface", "../fixtures/vendored/foo.go")
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("returns a model representing the named function alias", func() {
+					Expect(model.Name).To(Equal("FooInterface"))
+					Expect(model.RepresentedByInterface).To(BeTrue())
+					Expect(model.ImportPath).To(Equal("github.com/maxbrunsfeld/counterfeiter/fixtures/vendored"))
+				})
+
+				It("should have a single method", func() {
+					Expect(model.Methods).To(HaveLen(1))
+					Expect(model.Methods[0].Field.Names[0].Name).To(Equal("FooVendor"))
+				})
 			})
 
-			It("returns a model representing the named function alias", func() {
-				Expect(model.Name).To(Equal("BazInterface"))
-				Expect(model.RepresentedByInterface).To(BeTrue())
+			Context("when the vendor dir is in a parent directory", func() {
+				JustBeforeEach(func() {
+					model, err = GetInterfaceFromFilePath("BazInterface", "../fixtures/vendored/baz/baz.go")
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("returns a model representing the named function alias", func() {
+					Expect(model.Name).To(Equal("BazInterface"))
+					Expect(model.RepresentedByInterface).To(BeTrue())
+					Expect(model.ImportPath).To(Equal("github.com/maxbrunsfeld/counterfeiter/fixtures/vendored/baz"))
+				})
+
+				It("should have a single method", func() {
+					Expect(model.Methods).To(HaveLen(1))
+					Expect(model.Methods[0].Field.Names[0].Name).To(Equal("FooVendor"))
+				})
 			})
 
-			It("should have a single method", func() {
-				Expect(model.Methods).To(HaveLen(1))
-				Expect(model.Methods[0].Field.Names[0].Name).To(Equal("FooVendor"))
-			})
-		})
+			Context("when the vendor code shadows a higher level", func() {
+				JustBeforeEach(func() {
+					model, err = GetInterfaceFromFilePath("BarInterface", "../fixtures/vendored/bar/bar.go")
+					Expect(err).NotTo(HaveOccurred())
+				})
 
-		Context("when the vendor code shadows a higher level", func() {
-			JustBeforeEach(func() {
-				model, err = GetInterfaceFromFilePath("BarInterface", "../fixtures/vendored/bar/bar.go")
-				Expect(err).NotTo(HaveOccurred())
-			})
+				It("returns a model representing the named function alias", func() {
+					Expect(model.Name).To(Equal("BarInterface"))
+					Expect(model.RepresentedByInterface).To(BeTrue())
+					Expect(model.ImportPath).To(Equal("github.com/maxbrunsfeld/counterfeiter/fixtures/vendored/bar"))
+				})
 
-			It("returns a model representing the named function alias", func() {
-				Expect(model.Name).To(Equal("BarInterface"))
-				Expect(model.RepresentedByInterface).To(BeTrue())
-			})
-
-			It("should have a single method", func() {
-				Expect(model.Methods).To(HaveLen(1))
-				Expect(model.Methods[0].Field.Names[0].Name).To(Equal("BarVendor"))
+				It("should have a single method", func() {
+					Expect(model.Methods).To(HaveLen(1))
+					Expect(model.Methods[0].Field.Names[0].Name).To(Equal("BarVendor"))
+				})
 			})
 		})
 	})

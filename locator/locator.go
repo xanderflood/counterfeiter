@@ -9,10 +9,10 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/maxbrunsfeld/counterfeiter/model"
+	"strconv"
 )
 
 func GetInterfaceFromFilePath(interfaceName, filePath string) (*model.InterfaceToFake, error) {
@@ -60,6 +60,14 @@ func GetInterfaceFromImportPath(interfaceName, importPath string, vendorPaths ..
 				pkgImport = "xyz123"
 			}
 
+			importSpecs[pkgImport] = &ast.ImportSpec{
+				Name: &ast.Ident{Name: pkgImport},
+				Path: &ast.BasicLit{
+					Kind:  token.STRING,
+					Value: strconv.Quote(importPath),
+				},
+			}
+
 			var methods []model.Method
 			var err error
 			switch iface.(type) {
@@ -77,18 +85,12 @@ func GetInterfaceFromImportPath(interfaceName, importPath string, vendorPaths ..
 				return nil, err
 			}
 
-			importSpecs[pkgImport] = &ast.ImportSpec{
-				Name: &ast.Ident{Name: pkgImport},
-				Path: &ast.BasicLit{
-					Kind:  token.STRING,
-					Value: strconv.Quote(importPath),
-				},
-			}
+			correctImportPath := vendorAwareImportPath(importPath)
 
 			return &model.InterfaceToFake{
 				Name:                   interfaceName,
 				Methods:                methods,
-				ImportPath:             importPath,
+				ImportPath:             correctImportPath,
 				PackageName:            pkg.Name,
 				RepresentedByInterface: !isFunction,
 			}, nil
@@ -97,7 +99,6 @@ func GetInterfaceFromImportPath(interfaceName, importPath string, vendorPaths ..
 
 	return nil, fmt.Errorf("Could not find interface '%s'", interfaceName)
 }
-
 func getDir(path string) (string, error) {
 	stat, err := os.Stat(path)
 	if err != nil {
@@ -178,6 +179,14 @@ func goSourcePaths() []string {
 
 func packagesForDirPath(path string) (map[string]*ast.Package, error) {
 	return parser.ParseDir(token.NewFileSet(), path, nil, parser.AllErrors)
+}
+
+func vendorAwareImportPath(importPath string) string {
+	if strings.Contains(importPath, "/vendor/") {
+		return strings.SplitAfter(importPath, "/vendor/")[1]
+	} else {
+		return importPath
+	}
 }
 
 func findInterface(pkg *ast.Package, interfaceName string) (ast.Node, *ast.File, bool, error) {
