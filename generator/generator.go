@@ -135,7 +135,6 @@ func (gen CodeGenerator) imports() ast.Decl {
 
 	aliases := map[string]bool{}
 	aliases[gen.Model.PackageName] = true
-	gen.packageAlias[modelImportName] = gen.Model.PackageName
 	for importName := range allImports {
 		if _, found := gen.packageAlias[importName]; found {
 			continue
